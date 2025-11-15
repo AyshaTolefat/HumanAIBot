@@ -13,14 +13,33 @@ st.markdown(
 )
 
 
-st.sidebar.title("Chat history")
-st.sidebar.button("New Chat")
+st.sidebar.title("Chat History")
 
 prompt = st.chat_input(
     "Enter a topic and/or attach an image",
     accept_file=True,
     file_type=["jpg", "jpeg", "png", "pdf"],
 )
+
+if "messages" not in st.session_state:
+    st.session_state.messages =[{"role":"assistant","content":"Please upload your document so we can get started!"}]
+
+if st.sidebar.button("New Chat"):
+    st.session_state.messages =[{"role":"assistant","content":"Please upload your document so we can get started!"}]
+    #st.session_state.messages =[]
+    st.rerun()
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        if message["role"] == "user":
+            st.markdown(message["content"].text)
+        else:
+            st.markdown(message["content"])
+if prompt:
+    st.session_state.messages.append({"role":"user","content":prompt})
+
+    with st.chat_message("user"):
+        st.markdown(prompt.text)
 
 if st.button("View Results"):
     st.switch_page("pages/results.py")
