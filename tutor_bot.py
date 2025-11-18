@@ -4,6 +4,7 @@ from langchain_mistralai import ChatMistralAI
 
 st.title("Welcome to your own Tutor Bot!")
 API_KEY= "4leOKUn3QNyLUB8sDAMw06kVXEqYJ1M7"
+
 st.markdown(
     """
     This bot helps you understand your strengths and weaknesses in any topic you would like. 
@@ -19,6 +20,18 @@ if "chat_history" not in st.session_state:
 
 if "chat_title" not in st.session_state:
     st.session_state.chat_title = "New chat"
+
+def get_llm():
+    return ChatMistralAI(
+        api_key=API_KEY,
+        model="mistral-small-latest",
+        temperature=0.3,
+    )
+
+def ask_mistral(user_text: str) -> str:
+    llm = get_llm()
+    response = llm.invoke(user_text)
+    return response.content
 
 prompt = st.chat_input(
     "Enter a topic and/or attach an image",
@@ -80,6 +93,13 @@ if prompt is not None:
         st.markdown(user_text)
         for f in user_files:
             st.caption(f"Attached file: {f.name}")
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            answer = ask_mistral(user_text)
+        st.markdown(answer)
+
+    st.session_state.messages.append({"role": "assistant", "content": answer})
 
 if st.button("View Results"):
     st.switch_page("pages/results.py")
