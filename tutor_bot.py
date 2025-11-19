@@ -34,6 +34,38 @@ def ask_mistral(user_text: str) -> str:
     response = llm.invoke(user_text)
     return response.content
 
+def generate_quiz(num_questions: int=20) -> str:
+    material = st.session_state.get("source_text", "").strip()
+    if not material:
+        return (
+            "I dont have any material yet."
+            "Please type a topic or upload a PDF."
+        )
+    llm = get_llm()
+    prompt = f"""
+You are a helpful tutor. Your task is to create a quiz based on the pdf provided by the student to test the student's understanding based ONLY on the study material provided. The goal is to find the student's weak points and strengths in the material they provided you with.
+
+STUDY MATERIAL:
+--------------
+{material[:6000]}
+--------------
+TASK: 
+-Create {num_questions} multiple-chocie questions.
+- Each question should have four options: A, B, C, D.
+
+FORMAT EXAMPLE:
+Q1. What is ...?
+A) ...
+B) ...
+C) ...
+D) ...
+
+Now generate the full quiz in this format.
+"""
+    response = llm.invoke(prompt)
+    return response.content
+
+
 def extract_text_from_pdfs(files):
     texts=[]
     for f in files:
@@ -137,6 +169,14 @@ if prompt is not None:
         st.markdown(answer)
 
     st.session_state.messages.append({"role": "assistant", "content": answer})
+
+if st.session_state.get("source_text"):
+    if st.button("Generate quiz"):
+        with st.chat_message("assistant"):
+            with st.spinner("Generating quiz from your material..."):
+                quiz_text = generate_quiz(num_questions = 20)
+            st.markdown(quiz_text)
+        st.session_state.messages.append({"role": "assistant", "content": quiz_text})
 
 if st.button("View Results"):
     st.switch_page("pages/results.py")
