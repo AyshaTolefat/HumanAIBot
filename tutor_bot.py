@@ -1,4 +1,5 @@
 import streamlit as st
+import PyPDF2
 from langchain_mistralai import ChatMistralAI
 #from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
@@ -32,6 +33,20 @@ def ask_mistral(user_text: str) -> str:
     llm = get_llm()
     response = llm.invoke(user_text)
     return response.content
+
+def extract_text_from_pdfs(files):
+    texts=[]
+    for f in files:
+        if f.type == "application/pdf":
+            try:
+                reader = PyPDF2.PdfReader(f)
+                pdf_text = ""
+                for page in reader.pages:
+                    pdf_text += page.extract_text() or ""
+                texts.append(pdf_text)
+            except Exception as e:
+                texts.append(f"[Error reading PDF {f.name}: {e}]")
+    return "\n\n".join(texts)
 
 prompt = st.chat_input(
     "Enter a topic and/or attach an image",
@@ -84,6 +99,15 @@ if prompt is not None:
     user_text = prompt.text
     user_files = prompt.files
 
+    pdf_text = extract_text_from_pdfs(user_files)
+
+    if "source_text" not in st.session_state:
+        st.session_state.source_text = ""
+    if pdf_text:
+        st.session_state.source_text = pdf_text
+    elif user_text:
+        st.session_state.source_text = user_text
+
     if st.session_state.chat_title == "New chat" and user_text:
         st.session_state.chat_title = user_text
 
@@ -94,9 +118,22 @@ if prompt is not None:
         for f in user_files:
             st.caption(f"Attached file: {f.name}")
 
+    if pdf_text:
+        combined_text = (
+            "The student wants to study this material: \n\n"
+            f"{pdf_text[:6000]}\n\n"
+            "And they said:\n"
+            f"{user_text}"
+        )
+    else:
+        combined_text = user_text or ""
+
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            answer = ask_mistral(user_text)
+        if not combined_text.strip():
+            answer = "I didn't recieve any text or readable PDF content. Please type something or upload a PDF."
+        else:
+            with st.spinner("Thinking..."):
+                answer = ask_mistral(combined_text)
         st.markdown(answer)
 
     st.session_state.messages.append({"role": "assistant", "content": answer})
