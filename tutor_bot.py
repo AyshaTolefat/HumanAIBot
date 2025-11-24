@@ -1,7 +1,7 @@
 import streamlit as st
 import PyPDF2
 from langchain_mistralai import ChatMistralAI
-#from langchain.schema import HumanMessage, SystemMessage, AIMessage
+import ast
 
 st.title("Welcome to your own Tutor Bot!")
 API_KEY= "4leOKUn3QNyLUB8sDAMw06kVXEqYJ1M7"
@@ -22,6 +22,124 @@ if "chat_history" not in st.session_state:
 if "chat_title" not in st.session_state:
     st.session_state.chat_title = "New chat"
 
+if "topic_list" not in st.session_state:
+    st.session_state.topic_list = []
+
+if "generate_topic" not in st.session_state:
+    st.session_state.generate_topic = True
+
+if "topic_one_q" not in st.session_state:
+    st.session_state.topic_one_q = False
+
+if "topic_two_q" not in st.session_state:
+    st.session_state.topic_two_q = False
+
+if "topic_three_q" not in st.session_state:
+    st.session_state.topic_three_q = False
+
+if "topic_four_q" not in st.session_state:
+    st.session_state.topic_four_q = False
+
+if "topic_five_q" not in st.session_state:
+    st.session_state.topic_five_q = False
+
+if "finish" not in st.session_state:
+    st.session_state.finish = False
+
+if "topic_one_answers" not in st.session_state:
+    st.session_state.topic_one_answers = ["","","",""]
+
+if "topic_two_answers" not in st.session_state:
+    st.session_state.topic_two_answers = ["","","",""]
+
+if "topic_three_answers" not in st.session_state:
+    st.session_state.topic_three_answers = ["","","",""]
+
+if "topic_four_answers" not in st.session_state:
+    st.session_state.topic_four_answers = ["","","",""]
+
+if "topic_five_answers" not in st.session_state:
+    st.session_state.topic_five_answers = ["","","",""]
+
+if "topic_one_correct" not in st.session_state:
+    st.session_state.topic_one_correct = ""
+
+if "topic_two_correct" not in st.session_state:
+    st.session_state.topic_two_correct = ""
+
+if "topic_three_correct" not in st.session_state:
+    st.session_state.topic_three_correct = ""
+
+if "topic_four_correct" not in st.session_state:
+    st.session_state.topic_four_correct = ""
+
+if "topic_five_correct" not in st.session_state:
+    st.session_state.topic_five_correct = ""
+
+if  "topic_one_questions" not in st.session_state:
+    st.session_state.topic_one_questions = ""
+
+if  "topic_two_questions" not in st.session_state:
+    st.session_state.topic_two_questions = ""
+
+if  "topic_three_questions" not in st.session_state:
+    st.session_state.topic_three_questions = ""
+
+if  "topic_four_questions" not in st.session_state:
+    st.session_state.topic_four_questions = ""
+
+if  "topic_five_questions" not in st.session_state:
+    st.session_state.topic_five_questions = ""
+
+if "topic_one_generated" not in st.session_state:
+    st.session_state.topic_one_generated = False
+
+if "topic_two_generated" not in st.session_state:
+    st.session_state.topic_two_generated = False
+
+if "topic_three_generated" not in st.session_state:
+    st.session_state.topic_three_generated = False
+
+if "topic_four_generated" not in st.session_state:
+    st.session_state.topic_four_generated = False
+
+if "topic_five_generated" not in st.session_state:
+    st.session_state.topic_five_generated = False
+
+if "topic_one_score" not in st.session_state:
+    st.session_state.topic_one_score = False
+
+if "topic_two_score" not in st.session_state:
+    st.session_state.topic_two_score = False
+
+if "topic_three_score" not in st.session_state:
+    st.session_state.topic_three_score = False
+
+if "topic_four_score" not in st.session_state:
+    st.session_state.topic_four_score = False
+
+if "topic_five_score" not in st.session_state:
+    st.session_state.topic_five_score = False
+
+if "show_results" not in st.session_state:
+    st.session_state.show_results = False
+
+if "topic_one_score_analysis" not in st.session_state:
+    st.session_state.topic_one_score_analysis = ""
+
+if "topic_two_score_analysis" not in st.session_state:
+    st.session_state.topic_two_score_analysis = ""
+
+if "topic_three_score_analysis" not in st.session_state:
+    st.session_state.topic_three_score_analysis = ""
+
+if "topic_four_score_analysis" not in st.session_state:
+    st.session_state.topic_four_score_analysis = ""
+
+if "topic_five_score_analysis" not in st.session_state:
+    st.session_state.topic_five_score_analysis = ""
+
+
 def get_llm():
     return ChatMistralAI(
         api_key=API_KEY,
@@ -34,7 +152,7 @@ def ask_mistral(user_text: str) -> str:
     response = llm.invoke(user_text)
     return response.content
 
-def generate_quiz(num_questions: int=20) -> str:
+def identify_topics(num_topics: int=5) -> str:
     material = st.session_state.get("source_text", "").strip()
     if not material:
         return (
@@ -43,28 +161,166 @@ def generate_quiz(num_questions: int=20) -> str:
         )
     llm = get_llm()
     prompt = f"""
-You are a helpful tutor. Your task is to create a quiz based on the pdf provided by the student to test the student's understanding based ONLY on the study material provided. The goal is to find the student's weak points and strengths in the material they provided you with.
+You are a helpful tutor. Your task if to identify the five key topics in the study material provided.
+
+STUDY MATERIAL:{material[:6000]}
+
+You should output the topics in this format: "Topic 1","Topic 2","Topic 3","Topic 4","Topic 5"
+Don't include any other text only the ouput in the format.
+
+"""
+
+    response = llm.invoke(prompt)
+
+    topic_list = response.content
+
+    topic_list = [x.strip().strip('"') for x in topic_list.split(",")]
+
+    st.session_state.topic_list = topic_list
+
+    topic_list_text = ", ".join(topic_list)
+
+    topic_message = (
+        f"I have identified the key topics: {topic_list_text}.\n\n"
+        "I am going to ask you questions on each topic. "
+        "Press the topic button to move on to the next topic."
+    )
+
+    return topic_message
+
+def generate_questions(topic_name,num_questions: int=4) -> str:
+    material = st.session_state.get("source_text", "").strip()
+    if not material:
+        return (
+            "I dont have any material yet."
+            "Please type a topic or upload a PDF."
+        )
+    llm = get_llm()
+    prompt = f"""
+You are a helpful tutor. Your task is to create questions based on the pdf provided by the student to test the student's understanding based ONLY on the study material provided. The goal is to find the student's weak points and strengths in the material they provided you with.
+
+You should create four multiple choice questions based on the provided topic using on the material provided.
 
 STUDY MATERIAL:
 --------------
 {material[:6000]}
 --------------
+
+TOPICS: {topic_name}
+
 TASK: 
--Create {num_questions} multiple-chocie questions.
+-Create {num_questions} multiple-choice questions.
 - Each question should have four options: A, B, C, D.
 
 FORMAT EXAMPLE:
+Topic Name
 Q1. What is ...?
 A) ...
 B) ...
 C) ...
 D) ...
 
-Now generate the full quiz in this format.
+Now generate the full quiz in this format. Do not provide any answers.
+"""
+
+    response = llm.invoke(prompt)
+
+    question_list = response.content
+
+    return question_list
+
+def generate_score(answers,correct):
+    score = 0
+
+    correct = correct.strip("[]")
+    correct = [x.strip().strip('"').strip("'") for x in correct.split(",")]
+
+    for i in range(len(answers)):
+        if answers[i] == correct[i]:
+            score+=1
+    
+    percentage = (score/4)*100
+
+    return percentage
+
+def score_analysis(answers, correct):
+    right = []
+    wrong = []
+
+    correct = correct.strip("[]")
+    correct = [x.strip().strip('"').strip("'") for x in correct.split(",")]
+
+    for i in range(len(answers)):
+        if answers[i] == correct[i]:
+            right.append(i + 1)
+        else:
+            wrong.append(i + 1)
+
+    output = ""
+    if right:
+        output += "You got Questions " + ", ".join(map(str, right)) + " right. "
+    else:
+        output += "You got no questions right. "
+    
+    if wrong:
+        output += "You got Questions " + ", ".join(map(str, wrong)) + " wrong."
+    else:
+        output += "You got no questions wrong."
+
+    return output
+    
+
+def show_options(form_name,key,answers):
+ 
+    with st.form(form_name):
+        st.markdown(f"Question 1")
+        options = ["A", "B", "C", "D"]
+        st.pills("Options", options,key=f"q1.{key}")
+
+        st.markdown(f"Question 2")
+        st.pills("Options", options,key=f"q2.{key}")
+
+        st.markdown(f"Question 3")
+        st.pills("Options", options,key=f"q3.{key}")
+
+        st.markdown(f"Question 4")
+        st.pills("Options", options,key=f"q4.{key}")
+    
+        submitted = st.form_submit_button("Submit",key=f"s{key}")
+
+    if submitted:
+        st.success("Next Topic")
+        answers[0] = st.session_state.get(f"q1.{key}")
+        answers[1] = st.session_state.get(f"q2.{key}")
+        answers[2] = st.session_state.get(f"q3.{key}")
+        answers[3] = st.session_state.get(f"q4.{key}")
+    
+def generate_answers(questions):
+    material = st.session_state.get("source_text", "").strip()
+    if not material:
+        return (
+            "I dont have any material yet."
+            "Please type a topic or upload a PDF."
+        )
+    llm = get_llm()
+    prompt = f"""
+You are a helpful tutor. Your task is to generate answers to provided questions based on only the material provided.
+You will be provided with a list of multiple choice questions and you must return the answers.
+
+STUDY MATERIAL:
+--------------
+{material[:6000]}
+
+QUESTIONS: {questions}
+
+You should output the answers in this format: ["A","B","C","D"] where entry one is the answer to question 1 etc. Only provide the answers not exta text.
+
 """
     response = llm.invoke(prompt)
-    return response.content
 
+    answer_list = response.content
+
+    return answer_list
 
 def extract_text_from_pdfs(files):
     texts=[]
@@ -171,13 +427,87 @@ if prompt is not None:
     st.session_state.messages.append({"role": "assistant", "content": answer})
 
 if st.session_state.get("source_text"):
-    if st.button("Generate quiz"):
-        with st.chat_message("assistant"):
-            with st.spinner("Generating quiz from your material..."):
-                quiz_text = generate_quiz(num_questions = 20)
-            st.markdown(quiz_text)
-        st.session_state.messages.append({"role": "assistant", "content": quiz_text})
 
-if st.button("View Results"):
-    st.switch_page("pages/results.py")
+    if st.session_state.generate_topic:
+        if st.button("Generate Topics"):
+            with st.chat_message("assistant"):
+                with st.spinner("Generating topics from your material..."):
+                    topic_list = identify_topics()
+                st.markdown(topic_list)
+            st.session_state.messages.append({"role": "assistant", "content": topic_list})
+            st.session_state.topic_one_q = True
+            st.session_state.generate_topic = False
 
+def display_questions(topic_index,topic_flag,next_topic_flag,answers_key,button_label):
+
+    if st.session_state.get(topic_flag, False):
+        if st.button(button_label):
+            with st.chat_message("assistant"):
+                with st.spinner(f"Generating questions for Topic {topic_index+1}.."):
+                    questions = generate_questions(st.session_state.topic_list[topic_index])
+                    st.session_state[f"{answers_key}_questions"] = questions
+                    st.session_state[f"{answers_key}_generated"] = True
+
+                    st.session_state[f"{answers_key}_correct"] = generate_answers(st.session_state[f"{answers_key}_questions"])
+
+                    st.session_state.messages.append({"role": "assistant", "content": questions})
+        
+        if st.session_state.get(f"{answers_key}_generated", False):
+                questions = st.session_state[f"{answers_key}_questions"]
+                st.markdown(questions)
+                
+                show_options(answers_key,topic_index,st.session_state[f"{answers_key}_answers"])
+                if all(st.session_state[f"{answers_key}_answers"]):
+                    st.session_state[next_topic_flag] = True
+
+if st.session_state.topic_one_q:
+    display_questions(topic_index=0,
+    topic_flag="topic_one_q",
+    next_topic_flag="topic_two_q",
+    answers_key="topic_one",
+    button_label="Topic 1")
+
+if st.session_state.topic_two_q:
+    display_questions(topic_index=1,
+    topic_flag="topic_two_q",
+    next_topic_flag="topic_three_q",
+    answers_key="topic_two",
+    button_label="Topic 2")
+
+if st.session_state.topic_three_q:
+    display_questions(topic_index=2,
+    topic_flag="topic_three_q",
+    next_topic_flag="topic_four_q",
+    answers_key="topic_three",
+    button_label="Topic 3")
+
+if st.session_state.topic_four_q:
+    display_questions(topic_index=3,
+    topic_flag="topic_four_q",
+    next_topic_flag="topic_five_q",
+    answers_key="topic_four",
+    button_label="Topic 4")
+
+if st.session_state.topic_five_q:
+    display_questions(topic_index=4,
+    topic_flag="topic_five_q",
+    next_topic_flag="finish",
+    answers_key="topic_five",
+    button_label="Topic 5")
+
+if st.session_state.finish:
+    st.session_state.show_results = True
+    st.session_state.topic_one_score = generate_score(st.session_state.topic_one_answers,st.session_state.topic_one_correct)
+    st.session_state.topic_two_score = generate_score(st.session_state.topic_two_answers,st.session_state.topic_two_correct)
+    st.session_state.topic_three_score = generate_score(st.session_state.topic_three_answers,st.session_state.topic_three_correct)
+    st.session_state.topic_four_score = generate_score(st.session_state.topic_four_answers,st.session_state.topic_four_correct)
+    st.session_state.topic_five_score = generate_score(st.session_state.topic_five_answers,st.session_state.topic_five_correct)
+
+    st.session_state.topic_one_score_analysis = score_analysis(st.session_state.topic_one_answers,st.session_state.topic_one_correct)
+    st.session_state.topic_two_score_analysis = score_analysis(st.session_state.topic_two_answers,st.session_state.topic_two_correct)
+    st.session_state.topic_three_score_analysis = score_analysis(st.session_state.topic_three_answers,st.session_state.topic_three_correct)
+    st.session_state.topic_four_score_analysis = score_analysis(st.session_state.topic_four_answers,st.session_state.topic_four_correct)
+    st.session_state.topic_five_score_analysis = score_analysis(st.session_state.topic_five_answers,st.session_state.topic_five_correct)
+
+    if st.button("View Results"):
+        st.switch_page("pages/results.py")
