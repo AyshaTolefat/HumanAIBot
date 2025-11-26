@@ -332,11 +332,30 @@ def score_analysis(answers, correct):
         output += "You got no questions wrong."
 
     return output
+
+def analyse_topic_answers(answers, correct_str):
+    """Return 2 lists: questions numbers that are right and wrong."""
+    correct_str = correct_str.strip("[]")
+    correct_list = [
+        x.strip().strip('"').strip('"')
+        for x in correct_str.split(",")
+        if x.strip()
+    ]
+    right = []
+    wrong = []
+    for i, ans in enumerate(answers):
+        if not ans:
+            continue
+        if i < len(correct_list) and ans == correct_list[i]:
+            right.append(i+1)
+        else:
+            wrong.append(i+1)
+    return right, wrong
     
 
-def show_options(form_name,topic_index, question_objs, answers):
+def show_options(form_name,topic_index, question_objs, answers, correct_str):
     """
-    Render each question with its options, and store chosen A/B/C/D letters in 'answers' ONLY after the user submits.
+    Render each question with its options, and store chosen A/B/C/D letters in 'answers' ONLY after the user submits. Then show which questions were correct/incorrect.
     """
     letters = ["A", "B", "C", "D"]
  
@@ -370,10 +389,18 @@ def show_options(form_name,topic_index, question_objs, answers):
     if submitted:
         for i, choice in enumerate(temp_choices):
             if choice.startswith("Select"):
-                answers[i]
+                answers[i] = ""
             else:
                 answers[i] = choice[0]
-        st.success("Your answers for this topic have been recorded. You can move to the next topic.")
+        right, wrong = analyse_topic_answers(answers, correct_str)
+        if right:
+            st.success("✅ Correct:" + ",".join(f"Q{n}" for n in right))
+        if wrong:
+            st.error("❌ Incorrect:" + ",".join(f"Q{n}" for n in wrong))
+        if "" in answers:
+            st.warning("Please answer all questions before moving to the next topic.")
+        else:
+            st.info("You have answered all questions for this topic. You may move onto the next topic.")
     
 def generate_answers(questions):
     material = st.session_state.get("source_text", "").strip()
@@ -553,6 +580,7 @@ def display_questions(topic_index,topic_flag,next_topic_flag,answers_key,button_
                     topic_index=topic_index,
                     question_objs=q_objs,
                     answers=st.session_state[f"{answers_key}_answers"],
+                    correct_str=st.session_state[f"{answers_key}_correct"]
                 )
                 if all(st.session_state[f"{answers_key}_answers"]):
                     st.session_state[next_topic_flag] = True
