@@ -2,6 +2,7 @@ import streamlit as st
 import PyPDF2
 from langchain_mistralai import ChatMistralAI
 import ast
+import json
 
 st.title("Welcome to your own Tutor Bot!")
 API_KEY= "4leOKUn3QNyLUB8sDAMw06kVXEqYJ1M7"
@@ -215,10 +216,11 @@ Don't include any other text only the ouput in the format.
 
     return topic_message
 
-def generate_questions(topic_name,num_questions: int=4) -> str:
+def generate_questions(topic_name,num_questions: int=4):
     material = st.session_state.get("source_text", "").strip()
     if not material:
         return (
+            [],
             "I dont have any material yet."
             "Please type a topic or upload a PDF."
         )
@@ -226,35 +228,70 @@ def generate_questions(topic_name,num_questions: int=4) -> str:
     prompt = f"""
 You are a helpful tutor. Your task is to create questions based on the pdf provided by the student to test the student's understanding based ONLY on the study material provided. The goal is to find the student's weak points and strengths in the material they provided you with.
 
-You should create four multiple choice questions based on the provided topic using on the material provided.
+You should create four multiple choice questions based on the provided topic using only the material provided.
 
 STUDY MATERIAL:
 --------------
 {material[:6000]}
 --------------
-
-TOPICS: {topic_name}
-
 TASK: 
--Create {num_questions} multiple-choice questions.
-- Each question should have four options: A, B, C, D.
+-Create EXACTLY {num_questions} multiple-choice questions.
+- Each question MUST be directly answerable from the study material.
+-Each question MUST have 4 options.
 
-FORMAT EXAMPLE:
-Topic Name
-Q1. What is ...?
-A) ...
-B) ...
-C) ...
-D) ...
+RESPONSE FORMAT:
+Respond with ONLY valid JSON. No explanations. No extra text.
+The JSON must be a list of objects like this:
+[
+    {{
+        "question": "What is ...?",
+        "options": [
+            "first option text",
+            "second option text",
+            "third option text",
+            "fourth option text",
+        ]
+    }},
+    ...
+]
 
-Now generate the full quiz in this format. Do not provide any answers.
+RULES:
+-Do NOT incldue the correct answers in the JSON.
+-Do NOT label options with A/B/C/D in the text. Just the option text.
 """
 
     response = llm.invoke(prompt)
+    raw = response.content.strip()
 
-    question_list = response.content
+    try:
+        start = raw.find("[")
+        end = raw.rfind("]")
+        if start != -1 and end != -1:
+            json_str = raw[start : end + 1]
+        else:
+            json_str = raw
 
-    return question_list
+        questions = json.loads(json_str)
+        if not isinstance(questions, list) or not questions:
+            return [], "Quiz generation failed: response was not a non-empty list."
+
+        md_lines = [f"**{topic_name}**", ""]
+        letters = ["A", "B", "C", "D"]
+        for idx, q in enumerate(questions):
+            md_lines.append(f"**Q{idx+1}. {q.get('question', '')}**")
+            opts = q.get("options", [])
+            for j, opt in enumerate(opts[:4]):
+                md_lines.append(f"{letters[j]}) {opt}")
+            md_lines.append("")  # blank line between questions
+
+        markdown_text = "\n".join(md_lines)
+        return questions, markdown_text
+
+    except Exception as e:
+        return [], f"Quiz generation failed while parsing JSON: {e}\nRaw response:\n{raw}"
+
+
+
 
 def generate_score(answers,correct):
     score = 0
@@ -297,30 +334,46 @@ def score_analysis(answers, correct):
     return output
     
 
-def show_options(form_name,key,answers):
+def show_options(form_name,topic_index, question_objs, answers):
+    """
+    Render each question with its options, and store chosen A/B/C/D letters in 'answers' ONLY after the user submits.
+    """
+    letters = ["A", "B", "C", "D"]
  
     with st.form(form_name):
-        st.markdown(f"Question 1")
-        options = ["A", "B", "C", "D"]
-        st.pills("Options", options,key=f"q1.{key}")
+        st.markdown(f"### Questions for topic {topic_index + 1}")
 
-        st.markdown(f"Question 2")
-        st.pills("Options", options,key=f"q2.{key}")
+        temp_choices = []
 
-        st.markdown(f"Question 3")
-        st.pills("Options", options,key=f"q3.{key}")
+        for i, q in enumerate(question_objs):
+            st.markdown(f"**Question {i+1}. {q.get('question', '')}**")
 
-        st.markdown(f"Question 4")
-        st.pills("Options", options,key=f"q4.{key}")
-    
-        submitted = st.form_submit_button("Submit",key=f"s{key}")
+            opts = q.get("options", [])
+            opts = (opts + ["", "", "", ""])[:4]
+            labeled_options = ["Select an answer..."] + [f"{letters[j]}) {opts[j]}" for j in range(4)]
+            exisiting = answers[i] if i < len(answers) else ""
+            if exisiting in letters:
+                default_index = letters.index(exisiting) + 1
+            else:
+                default_index= 0
+            choice = st.radio(
+                "Options",
+                labeled_options,
+                index=default_index,
+                key=f"{form_name}_q{i}",
+            )
+
+            temp_choices.append(choice)
+            st.markdown("---")
+        submitted = st.form_submit_button("Submit")
 
     if submitted:
-        st.success("Next Topic")
-        answers[0] = st.session_state.get(f"q1.{key}")
-        answers[1] = st.session_state.get(f"q2.{key}")
-        answers[2] = st.session_state.get(f"q3.{key}")
-        answers[3] = st.session_state.get(f"q4.{key}")
+        for i, choice in enumerate(temp_choices):
+            if choice.startswith("Select"):
+                answers[i]
+            else:
+                answers[i] = choice[0]
+        st.success("Your answers for this topic have been recorded. You can move to the next topic.")
     
 def generate_answers(questions):
     material = st.session_state.get("source_text", "").strip()
@@ -474,57 +527,76 @@ def display_questions(topic_index,topic_flag,next_topic_flag,answers_key,button_
     if st.session_state.get(topic_flag, False):
         if st.button(button_label):
             with st.chat_message("assistant"):
-                with st.spinner(f"Generating questions for Topic {topic_index+1}.."):
-                    questions = generate_questions(st.session_state.topic_list[topic_index])
-                    st.session_state[f"{answers_key}_questions"] = questions
-                    st.session_state[f"{answers_key}_generated"] = True
+                with st.spinner(f"Generating questions for Topic {topic_index+1}..."):
+                    q_objs, q_markdown = generate_questions(
+                        st.session_state.topic_list[topic_index]
+                    )
 
-                    st.session_state[f"{answers_key}_correct"] = generate_answers(st.session_state[f"{answers_key}_questions"])
+                    if not q_objs:
+                        st.markdown(q_markdown) 
+                    else:
+                        st.session_state[f"{answers_key}_question_objs"] = q_objs
+                        st.session_state[f"{answers_key}_questions"] = q_markdown
+                        st.session_state[f"{answers_key}_generated"] = True
+                        st.session_state[f"{answers_key}_correct"] = generate_answers(
+                            st.session_state[f"{answers_key}_questions"]
+                        )
 
-                    st.session_state.messages.append({"role": "assistant", "content": questions})
-        
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": q_markdown}
+                        )
         if st.session_state.get(f"{answers_key}_generated", False):
-                questions = st.session_state[f"{answers_key}_questions"]
-                st.markdown(questions)
-                
-                show_options(answers_key,topic_index,st.session_state[f"{answers_key}_answers"])
+            q_objs = st.session_state.get(f"{answers_key}_question_objs", [])
+            if q_objs:
+                show_options(
+                    form_name=answers_key,
+                    topic_index=topic_index,
+                    question_objs=q_objs,
+                    answers=st.session_state[f"{answers_key}_answers"],
+                )
                 if all(st.session_state[f"{answers_key}_answers"]):
                     st.session_state[next_topic_flag] = True
+
+def get_topic_label(idx: int) -> str:
+    topics = st.session_state.get("topic_list", [])
+    if idx < len(topics):
+        return topics[idx]
+    return f"Topic {idx + 1}"
 
 if st.session_state.topic_one_q:
     display_questions(topic_index=0,
     topic_flag="topic_one_q",
     next_topic_flag="topic_two_q",
     answers_key="topic_one",
-    button_label="Topic 1")
+    button_label=get_topic_label(0),)
 
 if st.session_state.topic_two_q:
     display_questions(topic_index=1,
     topic_flag="topic_two_q",
     next_topic_flag="topic_three_q",
     answers_key="topic_two",
-    button_label="Topic 2")
+    button_label=get_topic_label(1),)
 
 if st.session_state.topic_three_q:
     display_questions(topic_index=2,
     topic_flag="topic_three_q",
     next_topic_flag="topic_four_q",
     answers_key="topic_three",
-    button_label="Topic 3")
+    button_label=get_topic_label(2),)
 
 if st.session_state.topic_four_q:
     display_questions(topic_index=3,
     topic_flag="topic_four_q",
     next_topic_flag="topic_five_q",
     answers_key="topic_four",
-    button_label="Topic 4")
+    button_label=get_topic_label(3),)
 
 if st.session_state.topic_five_q:
     display_questions(topic_index=4,
     topic_flag="topic_five_q",
     next_topic_flag="finish",
     answers_key="topic_five",
-    button_label="Topic 5")
+    button_label=get_topic_label(4),)
 
 if st.session_state.finish:
     st.session_state.show_results = True
