@@ -152,6 +152,33 @@ def ask_mistral(user_text: str) -> str:
     response = llm.invoke(user_text)
     return response.content
 
+def summarize_material(material: str, user_text: str = "") -> str:
+    """Return a short summary and instruction to generate topics."""
+    llm = get_llm()
+    prompt = f"""
+You are a concise study assisstant.
+The student has provided the following study material and possibly a short message.
+
+STUDY MATERIAL:
+--------------
+{material[:4000]}
+--------------
+
+STUDENT MESSAGE:
+{user_text}
+
+TASK: 
+1. Write a brief summary of the main ideas in the study material in at most 3-4 sentences.
+2. The summary MUST be a single short paragraph.
+3. Then, on a new line, tell the stduent exactly this:
+Press the 'Generate Topics' button to identify key topics, then press each topic button to answer quiz questions for each topic."
+RULES:
+-Do NOT write more than one short paragraph of summary.
+-Do NOT add any other instructions or commentary.
+"""
+    response = llm.invoke(prompt)
+    return response.content
+
 def identify_topics(num_topics: int=5) -> str:
     material = st.session_state.get("source_text", "").strip()
     if not material:
@@ -420,8 +447,12 @@ if prompt is not None:
         if not combined_text.strip():
             answer = "I didn't recieve any text or readable PDF content. Please type something or upload a PDF."
         else:
-            with st.spinner("Thinking..."):
-                answer = ask_mistral(combined_text)
+            if pdf_text and st.session_state.get("generate_topic", True):
+                with st.spinner("Summarizing your document..."):
+                    answer = summarize_material(pdf_text, user_text)
+            else:
+                with st.spinner("Thinking..."):
+                    answer = ask_mistral(combined_text)
         st.markdown(answer)
 
     st.session_state.messages.append({"role": "assistant", "content": answer})
