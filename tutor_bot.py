@@ -247,6 +247,7 @@ def score_analysis(answers, correct):
     right = []
     wrong = []
 
+    correct_list = correct.strip("[]")
     correct = correct.strip("[]")
     correct = [x.strip().strip('"').strip("'") for x in correct.split(",")]
 
@@ -266,6 +267,8 @@ def score_analysis(answers, correct):
         output += "You got Questions " + ", ".join(map(str, wrong)) + " wrong."
     else:
         output += "You got no questions wrong."
+    
+    output += f" The correct answers were {correct_list}"
 
     return output
     
