@@ -1,6 +1,7 @@
 import streamlit as st
 import plt
 
+
 st.title("Your Results!")
 
 st.write("Here is an analysis of all your strengths and weaknesses!")
@@ -31,28 +32,28 @@ if st.session_state.get("show_results", False):
         
 
     with st.container(horizontal=True,horizontal_alignment="center"):
-        st.header(f":blue[{st.session_state.topic_list[0]} Score: {st.session_state.topic_one_score}%]")
-        st.markdown(st.session_state.topic_one_questions)
-        st.markdown(st.session_state.topic_one_score_analysis)
+        st.header(f":blue[{st.session_state.topic_list[0]} Score: {st.session_state.topic_one_score}%]",divider="blue")
+        st.subheader(st.session_state.topic_one_score_analysis)
+        st.markdown(st.session_state.topic_one_explanation)
     
     with st.container(horizontal=True,horizontal_alignment="center"):
-        st.header(f":green[{st.session_state.topic_list[1]} Score: {st.session_state.topic_two_score}%]")
-        st.markdown(st.session_state.topic_two_questions)
-        st.markdown(st.session_state.topic_two_score_analysis)
+        st.header(f":green[{st.session_state.topic_list[1]} Score: {st.session_state.topic_two_score}%]",divider="green")
+        st.subheader(st.session_state.topic_two_score_analysis)
+        st.markdown(st.session_state.topic_two_explanation)
     
     with st.container(horizontal=True,horizontal_alignment="center"):
-        st.header(f":red[{st.session_state.topic_list[2]} Score: {st.session_state.topic_three_score}%]")
-        st.markdown(st.session_state.topic_three_questions)
-        st.markdown(st.session_state.topic_three_score_analysis)
+        st.header(f":red[{st.session_state.topic_list[2]} Score: {st.session_state.topic_three_score}%]",divider="red")
+        st.subheader(st.session_state.topic_three_score_analysis)
+        st.markdown(st.session_state.topic_three_explanation)
     
     with st.container(horizontal=True,horizontal_alignment="center"):
-        st.header(f":orange[{st.session_state.topic_list[2]} Score: {st.session_state.topic_four_score}%]")
-        st.markdown(st.session_state.topic_four_questions)
-        st.markdown(st.session_state.topic_four_score_analysis)
+        st.header(f":orange[{st.session_state.topic_list[3]} Score: {st.session_state.topic_four_score}%]",divider="orange")
+        st.subheader(st.session_state.topic_four_score_analysis)
+        st.markdown(st.session_state.topic_four_explanation)
     
     with st.container(horizontal=True,horizontal_alignment="center"):
-        st.header(f":violet[{st.session_state.topic_list[4]} Score: {st.session_state.topic_five_score}%]")
-        st.markdown(st.session_state.topic_five_questions)
-        st.markdown(st.session_state.topic_five_score_analysis)
+        st.header(f":violet[{st.session_state.topic_list[4]} Score: {st.session_state.topic_five_score}%]",divider="violet")
+        st.subheader(st.session_state.topic_five_score_analysis)
+        st.markdown(st.session_state.topic_five_explanation)
     
 
