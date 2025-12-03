@@ -17,6 +17,9 @@ st.markdown(
 
 st.sidebar.title("Chat History")
 
+if "all_quiz_questions" not in st.session_state:
+    st.session_state.all_quiz_questions = []
+
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
@@ -155,6 +158,9 @@ if "topic_four_explanation" not in st.session_state:
 if "topic_five_explanation" not in st.session_state:
     st.session_state.topic_five_explanation = ""
 
+if "input_locked" not in st.session_state:
+    st.session_state.input_locked = False
+
 
 
 def get_llm():
@@ -240,6 +246,7 @@ def generate_questions(topic_name,num_questions: int=4):
             "I dont have any material yet."
             "Please type a topic or upload a PDF."
         )
+    existing_questions = st.session_state.get("all_quiz_questions", [])
     llm = get_llm()
     prompt = f"""
 You are a helpful tutor. Your task is to create questions based on the pdf provided by the student to test the student's understanding based ONLY on the study material provided. The goal is to find the student's weak points and strengths in the material they provided you with.
@@ -250,11 +257,16 @@ STUDY MATERIAL:
 --------------
 {material[:6000]}
 --------------
+CURRENT TOPIC: "{topic_name}"
+EXISITING_QUESTIONS (must not be repeated or rephrased):
+{json.dumps(existing_questions, ensure_ascii=False)}
 TASK: 
 -Create EXACTLY {num_questions} multiple-choice questions.
 -Each question MUST be directly answerable from the study material.
+-Each question MUST be specifically about the topic: "{topic_name}".
+-All questions MUST be unique and MUST NOT simply rephrase or repeat ANY question in EXISTING_QUESTIONS.
+-Across the whole quiz, avoid overlapping questions that test exactly the same idea.
 -Each question MUST have 4 options.
--Each question MUST be based on {topic_name}
 
 RESPONSE FORMAT:
 Respond with ONLY valid JSON. No explanations. No extra text.
@@ -417,7 +429,16 @@ def show_options(form_name,topic_index, question_objs, answers, correct_str):
         if "" in answers:
             st.warning("Please answer all questions before moving to the next topic.")
         else:
-            st.info("You have answered all questions for this topic. You may move onto the next topic.")
+            if topic_index == 4:
+                st.info(
+                    "You have answered all questions for the final topic. "
+                    "I am now generating your overall results. "
+                )
+            else:
+                st.info(
+                    "You have answered all questions for this topic. "
+                    "You may move onto the next topic. "
+                )
     
 def generate_answers(questions):
     material = st.session_state.get("source_text", "").strip()
@@ -482,11 +503,15 @@ def extract_text_from_pdfs(files):
                 texts.append(f"[Error reading PDF {f.name}: {e}]")
     return "\n\n".join(texts)
 
-prompt = st.chat_input(
-    "Enter a topic and/or attach an image",
-    accept_file=True,
-    file_type=["jpg", "jpeg", "png", "pdf"],
-)
+prompt = None
+if not st.session_state.input_locked:
+    prompt = st.chat_input(
+        "Enter a topic/ or attach an image",
+        accept_file=True,
+        file_type=["jpg", "jpeg", "png", "pdf"],
+    )
+else:
+    st.info("You have already uploaded a document. Continue with the key topics and quiz below.")
 
 if "messages" not in st.session_state:
     st.session_state.messages =[{"role":"assistant","content":"Please upload your document so we can get started!"}]
@@ -521,6 +546,7 @@ if st.sidebar.button("New Chat"):
         )
     st.session_state.messages =[{"role":"assistant","content":"Please upload your document so we can get started!"}]
     st.session_state.chat_title = "New chat"
+    st.session_state.input_locked = False
     st.rerun()
 
 for message in st.session_state.messages:
@@ -537,6 +563,7 @@ if prompt is not None:
         st.session_state.source_text = ""
     if pdf_text:
         st.session_state.source_text = pdf_text
+        st.session_state.input_locked = True
     elif user_text:
         st.session_state.source_text = user_text
 

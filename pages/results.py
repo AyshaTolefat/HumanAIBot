@@ -1,5 +1,6 @@
 import streamlit as st
-import plt
+import matplotlib.pyplot as plt
+
 
 
 st.title("Your Results!")
