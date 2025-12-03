@@ -455,7 +455,7 @@ Instructions:
 - For each question, write the question text first.
 - Clearly indicate the correct answer and provide a brief explanation (1-2 sentences)
 - For all other options, write out the full answer text and provide a short explanation of why this is incorrect.
-- Keep explainations concise
+- Keep explanations concise
 - First state the correct answer, then the incorrect answers
 
 QUESTIONS: {questions}
