@@ -3,3 +3,4 @@ langchain
 langchain-mistralai
 mistralai
 PyPDF2
+matplotlib
