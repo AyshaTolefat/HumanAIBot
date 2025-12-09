@@ -26,6 +26,9 @@ if "chat_history" not in st.session_state:
 if "chat_title" not in st.session_state:
     st.session_state.chat_title = "New chat"
 
+if "new_chat" not in st.session_state:
+    st.session_state.new_chat = False
+
 if "topic_list" not in st.session_state:
     st.session_state.topic_list = []
 
@@ -211,11 +214,12 @@ def identify_topics(num_topics: int=5) -> str:
         )
     llm = get_llm()
     prompt = f"""
-You are a helpful tutor. Your task if to identify the five key topics in the study material provided.
+You are a helpful tutor. Your task if to identify the five key topics in the study material provided. 
 
 STUDY MATERIAL:{material[:6000]}
 
-You should output the topics in this format: "Topic 1","Topic 2","Topic 3","Topic 4","Topic 5"
+You should output the topics in this format: "Topic 1"/"Topic 2"/"Topic 3"/"Topic 4"/"Topic 5". 
+Each topic should be unique there should be no overlap between topics. Each topic must represent a distinct area of discussion. Do not create topics that share overlapping meaning, subtopics or themes. Each topic must be highly specific, meaning the topic name should directly reference the concrete subject discussed.
 Don't include any other text only the ouput in the format.
 
 """
@@ -224,7 +228,7 @@ Don't include any other text only the ouput in the format.
 
     topic_list = response.content
 
-    topic_list = [x.strip().strip('"') for x in topic_list.split(",")]
+    topic_list = [x.strip().strip('"') for x in topic_list.split("/")]
 
     st.session_state.topic_list = topic_list
 
@@ -237,6 +241,32 @@ Don't include any other text only the ouput in the format.
     )
 
     return topic_message
+
+def generate_chat_title():
+    material = st.session_state.get("source_text", "").strip()
+    if not material:
+        return (
+            "I dont have any material yet."
+            "Please type a topic or upload a PDF."
+        )
+    llm = get_llm()
+    prompt = f"""You are a helpful tutor. Your task is to create a title that encapsulates the material provided.
+
+    Instructions:
+    - The title must be concise.
+    - The title must be relevant to the material.
+    - The title must accurately capture the overarching focus of the material
+    
+    Format: Only include the title nothing else.
+
+    STUDY MATERIAL: {material[:6000]}
+"""
+    response = llm.invoke(prompt)
+
+    generated_title = response.content.strip('"')
+
+    return generated_title
+
 
 def generate_questions(topic_name,num_questions: int=4):
     material = st.session_state.get("source_text", "").strip()
@@ -258,7 +288,7 @@ STUDY MATERIAL:
 {material[:6000]}
 --------------
 CURRENT TOPIC: "{topic_name}"
-EXISITING_QUESTIONS (must not be repeated or rephrased):
+EXISTING_QUESTIONS (must not be repeated or rephrased):
 {json.dumps(existing_questions, ensure_ascii=False)}
 TASK: 
 -Create EXACTLY {num_questions} multiple-choice questions.
@@ -476,7 +506,7 @@ Instructions:
 - For each question, write the question text first.
 - Clearly indicate the correct answer and provide a brief explanation (1-2 sentences)
 - For all other options, write out the full answer text and provide a short explanation of why this is incorrect.
-- Keep explanations concise
+- Keep explainations concise
 - First state the correct answer, then the incorrect answers
 
 QUESTIONS: {questions}
@@ -516,38 +546,47 @@ else:
 if "messages" not in st.session_state:
     st.session_state.messages =[{"role":"assistant","content":"Please upload your document so we can get started!"}]
 
-for i, chat in enumerate(st.session_state.chat_history):
-    if isinstance(chat, dict):
-        raw_title = chat.get("title")
+if st.session_state.new_chat:
+    for i, chat in enumerate(st.session_state.chat_history):
+        if isinstance(chat, dict):
+            raw_title = chat.get("title")
+        else:
+            raw_title = None
+
+        if not isinstance(raw_title, str) or raw_title.strip() == "":
+            raw_title = f"Chat {i+1}"
+
+        if len(raw_title) > 25:
+            raw_title = raw_title[:25] + "..."
+
+        title = str(raw_title)
+
+        if st.sidebar.button(title, key=f"history_{i}"):
+            if chat["title"] == title:
+                st.session_state.messages = chat["messages"]
+                #st.rerun()
+        
+    
+
+
+if st.sidebar.button("New Chat",type="primary"):
+    #title = f"Chat {len(st.session_state.chat_history) + 1}"
+    title = st.session_state.chat_title
+
+    if st.session_state.new_chat:
+        st.session_state.chat_history.append(
+            {
+                "title": title,
+                "messages": list(st.session_state.messages),
+            }
+            )
+        st.session_state.messages =[{"role":"assistant","content":"Please upload your document so we can get started!"}]
+        st.session_state.chat_title = "New chat"
+        st.session_state.input_locked = False
+        #st.session_state.new_chat = False
+        #st.rerun()
     else:
-        raw_title = None
-
-    if not isinstance(raw_title, str) or raw_title.strip() == "":
-        raw_title = f"Chat {i+1}"
-
-    if len(raw_title) > 25:
-        raw_title = raw_title[:25] + "..."
-
-    title = str(raw_title)
-
-    if st.sidebar.button(title, key=f"history_{i}"):
-        if chat["title"] == title:
-            st.session_state.messages = chat["messages"]
-            st.rerun()
-
-if st.sidebar.button("New Chat"):
-    title = f"Chat {len(st.session_state.chat_history) + 1}"
-
-    st.session_state.chat_history.append(
-        {
-            "title": title,
-            "messages": list(st.session_state.messages),
-        }
-        )
-    st.session_state.messages =[{"role":"assistant","content":"Please upload your document so we can get started!"}]
-    st.session_state.chat_title = "New chat"
-    st.session_state.input_locked = False
-    st.rerun()
+        st.toast("You haven't completed this chat yet")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -592,9 +631,15 @@ if prompt is not None:
             answer = "I didn't recieve any text or readable PDF content. Please type something or upload a PDF."
         else:
             if pdf_text and st.session_state.get("generate_topic", True):
+                chat_title = generate_chat_title()
+                st.session_state.chat_title = chat_title
+                st.session_state.messages.append({"role": "assistant", "content": chat_title})
                 with st.spinner("Summarizing your document..."):
                     answer = summarize_material(pdf_text, user_text)
             elif user_text and st.session_state.get("generate_topic", True):
+                chat_title = generate_chat_title()
+                st.session_state.chat_title = chat_title
+                st.session_state.messages.append({"role": "assistant", "content": chat_title})
                 with st.spinner("Summarizing your text..."):
                     answer = summarize_material(pdf_text, user_text)
             else:
@@ -695,6 +740,9 @@ if st.session_state.topic_five_q:
 
 if st.session_state.finish:
     st.session_state.show_results = True
+    st.session_state.new_chat = True
+
+
     st.session_state.topic_one_score = generate_score(st.session_state.topic_one_answers,st.session_state.topic_one_correct)
     st.session_state.topic_two_score = generate_score(st.session_state.topic_two_answers,st.session_state.topic_two_correct)
     st.session_state.topic_three_score = generate_score(st.session_state.topic_three_answers,st.session_state.topic_three_correct)
